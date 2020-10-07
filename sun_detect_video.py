@@ -1,22 +1,24 @@
 # import the necessary packages
 from imutils.video import FPS
 import numpy as np
-import imutils
 import time
 import math
 import cv2 as cv
 
+DEBUG = 1
+RECORD = 0
+
 def checkSun(frame,center,radius):
     test = [160,195,170]
     counter = 0
-    sampleArea = 5
-    for rad in range(0,12):
+    sampleArea = 3
+    for rad in range(0,8):
         x,y = center
-        x = x + int(radius*math.cos(rad * math.pi / 6))
-        y = y + int(radius*math.sin(rad * math.pi / 6))
+        x = x + int(radius*math.cos(rad * math.pi / 4 + math.pi/6))
+        y = y + int(radius*math.sin(rad * math.pi / 4 + math.pi/6))
         temp = averageColor(frame,x,y,sampleArea)
         if(test[0] > temp[0] and test[1] < temp[1] and test[2] < temp[2]):
-            counter += 1
+            return 1
     return counter
 
 def averageColor(frame,x,y,area):
@@ -39,7 +41,7 @@ fps = FPS().start()
 
 for counter in range(0,10):
     file = '/home/pi/opencv/capstone/videos/' + str(counter) + '.MOV'
-    output = '/home/pi/opencv/capstone/output/' + 'outpi - ' + str(counter) + '.avi'
+    output = '/home/pi/opencv/capstone/output/' + 'outpi' + str(counter) + '/ '+ time.ctime() + '.avi'
 
     # create VideoCapture object
     capture = cv.VideoCapture(file)
@@ -49,7 +51,8 @@ for counter in range(0,10):
     # get the frame width and height and modifyqqq
     frame_width = int(capture.get(3)/5)
     frame_height = int(capture.get(4)/5)
-    out = cv.VideoWriter(output,cv.VideoWriter_fourcc('M','J','P','G'), 10, (frame_width,frame_height))
+    out = cv.VideoWriter(output,cv.VideoWriter_fourcc('X','2','6','4'), 10, (frame_width,frame_height))
+    ret, frame = capture.read()
     # capture frames from the camera
     while(capture.isOpened()):
     #grab the raw NumPy array representing the image, then initialize the timestamp
@@ -62,8 +65,8 @@ for counter in range(0,10):
             gray = cv.cvtColor(blur, cv.COLOR_BGR2GRAY) 
             
             
-            ret,thresh = cv.threshold(gray,227,255,cv.THRESH_BINARY)
-            #thresh = cv.dilate(thresh, None, iterations=3)
+            ret,thresh = cv.threshold(gray,240,255,cv.THRESH_BINARY)
+            thresh = cv.dilate(thresh, None, iterations=3)
             #thresh = cv.erode(thresh,None,iterations=1)
             
             contours,hierarchy = cv.findContours(thresh, 1, 2)
@@ -72,30 +75,41 @@ for counter in range(0,10):
             if len(contours) > 0:
                 #Sort Contors by area
                 for cnts in contours:
-
-                    epsilon = 0.1*cv.arcLength(cnts, True)
-                    approx = cv.approxPolyDP(cnts, epsilon, True)
-                    (x,y),radius = cv.minEnclosingCircle(cnts)
-                    center = (int(x),int(y))
-                    radius = int(radius)
-                    if(checkSun(frame,center,radius) > 0):
-                        frame = cv.circle(frame,center,radius,(0,255,0),2)
+                    if(cv.contourArea(cnts)>10):
+                        epsilon = 0.1*cv.arcLength(cnts, True)
+                        approx = cv.approxPolyDP(cnts, epsilon, True)
+                        (x,y),radius = cv.minEnclosingCircle(cnts)
+                        center = (int(x),int(y))
+                        radius = int(radius)
+                        if(checkSun(frame,center,radius) > 0):
+                            frame = cv.circle(frame,center,radius,(0,255,0),2)
+                        else:
+                            if DEBUG:
+                                frame = cv.circle(frame,center,radius+5,(255,0,0),2)
+                                print('no contour that contains sun pixles ' , time.ctime());
                     else:
-                        print('no contour that contains sun pixles ' , time.ctime());
+                        if DEBUG:
+                            print('No contour large enough ' , time.ctime())
+                                
             else:
-                print('Sorry No contour Found ' , time.ctime())
+                if DEBUG:
+                    print('Sorry No contour Found ' , time.ctime())
         else:
             break
         
         # show the frame
-        cv.imshow("Frame", frame)
+        if DEBUG:
+            cv.imshow("Frame", frame)
         fps.update()
-        circles = 0
-        out.write(frame)
+        if RECORD:
+            out.write(frame)
         key = cv.waitKey(1) & 0xFF
         # if the `q` key was pressed, break from the loop
         if key == ord("q"):
             break
+    out.release()
+    capture.release()
+    
 fps.stop()
 print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))
 print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
