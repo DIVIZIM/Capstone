@@ -7,7 +7,7 @@ import cv2 as cv
 
 DEBUG = 1
 RECORD = 0
-
+#checks the rim of detected contours to find sun color
 def checkSun(frame,center,radius):
     test = [160,195,170]
     counter = 0
@@ -21,6 +21,7 @@ def checkSun(frame,center,radius):
             return 1
     return counter
 
+#currently O(N^2) planning on switching to a line based average color for O(N)
 def averageColor(frame,x,y,area):
     average = [0, 0, 0]
     counter = 0
@@ -40,6 +41,7 @@ def averageColor(frame,x,y,area):
 fps = FPS().start()
 
 for counter in range(0,10):
+    #input and output files
     file = '/home/pi/opencv/capstone/videos/' + str(counter) + '.MOV'
     output = '/home/pi/opencv/capstone/output/' + 'outpi' + str(counter) + '/ '+ time.ctime() + '.avi'
 
@@ -48,39 +50,49 @@ for counter in range(0,10):
     if (capture.isOpened() == False):
         print('Error while trying to open ' + file + '. Plese check again...')
 
-    # get the frame width and height and modifyqqq
+    # get the frame width and height and modify for increased performance
     frame_width = int(capture.get(3)/5)
     frame_height = int(capture.get(4)/5)
-    out = cv.VideoWriter(output,cv.VideoWriter_fourcc('X','2','6','4'), 10, (frame_width,frame_height))
+    
+    #output files for recording
+    if RECORD:
+        out = cv.VideoWriter(output,cv.VideoWriter_fourcc('X','2','6','4'), 10, (frame_width,frame_height))
+    
+    #discard first frame
     ret, frame = capture.read()
+    
     # capture frames from the camera
     while(capture.isOpened()):
-    #grab the raw NumPy array representing the image, then initialize the timestamp
-    # and occupied/unoccupied text
         ret, frame = capture.read()
         if ret == True:
         
+            #preform simple image conversions
             frame = cv.resize(frame,(frame_width,frame_height),fx=0,fy=0,interpolation = cv.INTER_CUBIC)
             blur = cv.GaussianBlur(frame, (5, 5), 2)               
             gray = cv.cvtColor(blur, cv.COLOR_BGR2GRAY) 
             
-            
+            #perform complex image conversions
             ret,thresh = cv.threshold(gray,240,255,cv.THRESH_BINARY)
             thresh = cv.dilate(thresh, None, iterations=3)
             #thresh = cv.erode(thresh,None,iterations=1)
             
+            #identify all shapes in the remaining image
             contours,hierarchy = cv.findContours(thresh, 1, 2)
             
 
             if len(contours) > 0:
-                #Sort Contors by area
                 for cnts in contours:
+                    #remove artifacts
                     if(cv.contourArea(cnts)>10):
+                        #draw circle from 
                         epsilon = 0.1*cv.arcLength(cnts, True)
                         approx = cv.approxPolyDP(cnts, epsilon, True)
                         (x,y),radius = cv.minEnclosingCircle(cnts)
+                        
                         center = (int(x),int(y))
                         radius = int(radius)
+                        
+                        #currently drawing many circles to aid in recognition of problems
                         if(checkSun(frame,center,radius) > 0):
                             frame = cv.circle(frame,center,radius,(0,255,0),2)
                         else:
@@ -107,7 +119,8 @@ for counter in range(0,10):
         # if the `q` key was pressed, break from the loop
         if key == ord("q"):
             break
-    out.release()
+    if RECORD:
+        out.release()
     capture.release()
     
 fps.stop()
