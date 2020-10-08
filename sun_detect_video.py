@@ -73,7 +73,7 @@ for counter in range(0,10):
             
             #perform complex image conversions
             ret,thresh = cv.threshold(gray,240,255,cv.THRESH_BINARY)
-            thresh = cv.dilate(thresh, None, iterations=3)
+            #thresh = cv.dilate(thresh, None, iterations=3)
             #thresh = cv.erode(thresh,None,iterations=1)
             
             #identify all shapes in the remaining image
@@ -85,8 +85,6 @@ for counter in range(0,10):
                     #remove artifacts
                     if(cv.contourArea(cnts)>10):
                         #draw circle from 
-                        epsilon = 0.1*cv.arcLength(cnts, True)
-                        approx = cv.approxPolyDP(cnts, epsilon, True)
                         (x,y),radius = cv.minEnclosingCircle(cnts)
                         
                         center = (int(x),int(y))
