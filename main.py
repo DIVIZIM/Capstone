@@ -90,7 +90,7 @@ def initilizeWiringPi():
 #(ABC,ABC)
 #(000,000)
 def setElement(element,value):
-    (x,y) = element
+    (y,x) = element
     x = decimalToBinary(x)
     y = decimalToBinary(y)
     
@@ -121,6 +121,33 @@ def setElement(element,value):
     wiringpi.digitalWrite(G,LOW)
     time.sleep(T_DELAY)
 
+def updateArray(update,history):
+    threshold = 5
+    maximum = 10
+    for x in range(0,8):
+        for y in range(0,8):
+            if(update[y][x] > history[y][x][0]):
+                if(history[y][x][1] >= threshold):
+                    setElement((y,x),update[y][x])
+                    history[y][x][0] = update[y][x]
+                else:
+                    if(history[y][x][1] <= maximum):
+                        history[y][x][1]+= 1 
+            elif(update[y][x] == history[y][x][0]):
+                if(update[y][x]):
+                    if(history[y][x][1] <= maximum):
+                        history[y][x][1]+= 1 
+                else:
+                    if(history[y][x][1] >= -maximum):
+                        history[y][x][1]-= 1 
+            else:
+                if(history[y][x][1] <= -threshold):
+                    setElement((y,x),update[y][x])
+                    history[y][x][0] = update[y][x]
+                else:
+                    if(history[y][x][1] >= -maximum):
+                        history[y][x][1]-= 1 
+            
 #CURRENT SENSOR SEUP
 """
 SHUNT_OHMS = 0.1
@@ -128,11 +155,9 @@ AMP = 2.0
 ina = INA219(SHUNT_OHMS,AMP)
 ina.configure(ina.RANGE_16V)
 """
-array_elements = [[0]*8]*8
-
+array_elements = [ [[0 for k in range(2)] for i in range(8) ] for j in range(8) ]
 # capture frames from the camera 
-while(capture0.isOpened() and capture1.isOpened()):
-    
+while(capture0.isOpened() and capture1.isOpened()):   
     
     """
     #SOFTWARE CURRENT PROTECTION
@@ -143,10 +168,12 @@ while(capture0.isOpened() and capture1.isOpened()):
         break
     """
     face_pos_x,face_pos_y,sun_pos_x,sun_pos_y = 0,0,0,0
-    
-    for i in array_elements:
-        print(i)
-    print("------------------------")
+    if DEBUG:
+        print("------------------------")
+        print("array_elements")
+        for i in array_elements:
+            print(i)
+        print("------------------------")
                 
     ret0, frame0 = capture0.read()
     ret1, frame1 = capture1.read()     
@@ -162,8 +189,8 @@ while(capture0.isOpened() and capture1.isOpened()):
                 ymin = int(detection[4] * frame1.shape[0])
                 xmax = int(detection[5] * frame1.shape[1])
                 ymax = int(detection[6] * frame1.shape[0])
-                face_pos_x = ((xmax + xmin)/2)/8
-                face_pos_y = (2/3*(ymax-ymin)+ymin)/8
+                face_pos_x = ((xmax + xmin)/2)/(capture1_width/8)
+                face_pos_y = (2/3*(ymax-ymin)+ymin)/(capture1_height/8)
 
         if ret0 == True: 
             blur = cv.GaussianBlur(frame0, (5, 5), 2)                
@@ -178,7 +205,7 @@ while(capture0.isOpened() and capture1.isOpened()):
              
 
             if len(contours) > 0:
-                temp = [[0]*8]*8
+                temp = [ [ 0 for i in range(8) ] for j in range(8) ]
                 #Sort Contors by area 
                 for cnts in contours:                    
                     if(cv.contourArea(cnts)>10): 
@@ -188,15 +215,15 @@ while(capture0.isOpened() and capture1.isOpened()):
                             radius = int(radius) 
                             frame0 = cv.circle(frame0,center,radius+5,(255,0,0),2)
                             
+                        #print(int((x-radius)/capture0_width*8))
+                        #temp[int(x/capture0_width*8)][int(y/capture0_width*8)] = 1
                             
-                        
-                        for ax in range(int((x-radius)/8),int((x+radius)/8)):
-                            for ay in range(int((y-radius)/8),int((y+radius)/8)):
+                        for ax in range(int((x-radius)/capture0_width*8),int((x+radius)/capture0_width*8)):
+                            for ay in range(int((y-radius)/capture0_height*8),int((y+radius)/capture0_height*8)):
                                 if(ax >= 0 and ay >= 0 and ax <=7 and ay<=7):
-                                    temp[ax][ay] = 1
-                for x in range(0,8):
-                    for y in range(0,8):
-                        array_elements[x][y] = temp[x][y]
+                                    temp[ay][ax] = 1
+                                                                              
+                updateArray(temp,array_elements)
                                 
                         
                                  
